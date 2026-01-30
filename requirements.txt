@@ -1,0 +1,5 @@
+kafka-python
+redis
+scikit-learn
+numpy
+pandas
