@@ -1,7 +1,7 @@
 import json
 import time
 from datetime import datetime
-
+from consumer.redis_state import update_redis_state
 from confluent_kafka import Consumer, KafkaException, KafkaError
 
 # -----------------------------
@@ -24,6 +24,8 @@ consumer = Consumer(consumer_conf)
 # Processing stub
 # -----------------------------
 def process_event(event, metadata):
+    update_redis_state(event)
+    
     print(
         f"[EVENT] payer={event['payer_upi_id']} "
         f"payee={event['payee_upi_id']} "
