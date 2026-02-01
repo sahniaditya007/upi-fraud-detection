@@ -16,14 +16,6 @@ class RuleEngine:
     def evaluate(self, transaction: dict, redis_state: dict):
         """
         Evaluate transaction against all Tier-1 fraud rules.
-
-        Inputs:
-        - transaction: raw Kafka event
-        - redis_state: derived behavioral features
-
-        Returns:
-        - risk_score (int)
-        - triggered_rules (list[str])
         """
 
         risk_score = 0
@@ -62,7 +54,12 @@ class RuleEngine:
         # -------------------------------
         night = self.rules["night_transaction"]
 
-        txn_time = datetime.fromisoformat(transaction["timestamp"])
+        event_time_ms = transaction.get("event_time")
+        if event_time_ms:
+            txn_time = datetime.fromtimestamp(event_time_ms / 1000)
+        else:
+            txn_time = datetime.utcnow()
+
         hour = txn_time.hour
 
         if night["start_hour"] <= hour <= night["end_hour"]:
@@ -82,7 +79,4 @@ class RuleEngine:
         return risk_score, triggered_rules
 
     def should_alert(self, risk_score: int) -> bool:
-        """
-        Decide whether to emit fraud alert
-        """
         return risk_score >= self.alert_threshold
