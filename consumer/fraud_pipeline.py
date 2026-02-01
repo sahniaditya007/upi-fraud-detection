@@ -10,7 +10,7 @@ from rules.rule_engine import evaluate_rules
 # Kafka configuration
 # -----------------------------
 KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
-TOPIC_NAME = "upi.transaction.raw"
+TOPIC_NAME = "upi.transactions.raw"
 CONSUMER_GROUP = "fraud-detector-v1"
 
 consumer_conf = {
@@ -51,7 +51,7 @@ def run():
                 continue
             
             if msg.error():
-                if msg.error().code() == KafkaError._PATITION_EOF:
+                if msg.error().code() == KafkaError._PARTITION_EOF:
                     continue
                 else:
                     raise KafkaException(msg.error())
