@@ -1,5 +1,20 @@
-kafka-python
-redis
-scikit-learn
-numpy
-pandas
+# Core Python
+python-dateutil>=2.8.2
+
+# Kafka
+confluent-kafka>=2.3.0
+
+# Redis
+redis>=5.0.1
+
+# Data & ML
+numpy>=1.26.0
+pandas>=2.1.0
+scikit-learn>=1.4.0
+joblib>=1.3.2
+
+# Rules / Config
+PyYAML>=6.0.1
+
+# Utilities
+tqdm>=4.66.1
