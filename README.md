@@ -37,16 +37,7 @@ The system:
 
 ## 🏗️ Architecture
 
-Producer (UPI Simulator)
-        ↓
-   Kafka Topic
-        ↓
-Fraud Consumer
-  ├── Redis (behavior state)
-  ├── Rule Engine
-  ├── ML Inference
-        ↓
- Fraud Alerts (stdout / logs)
+![/home/sahni/work/upi-fraud-detection/README.md](diagram.svg)
 
 
 ---
