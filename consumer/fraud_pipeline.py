@@ -3,6 +3,8 @@ import time
 from datetime import datetime
 from consumer.redis_state import update_redis_state
 from confluent_kafka import Consumer, KafkaException, KafkaError
+from rules.rule_engine import evaluate_rules
+
 
 # -----------------------------
 # Kafka configuration
@@ -25,6 +27,8 @@ consumer = Consumer(consumer_conf)
 # -----------------------------
 def process_event(event, metadata):
     update_redis_state(event)
+    
+    risk_score, triggered_rules = evaluate_rules(event)
     
     print(
         f"[EVENT] payer={event['payer_upi_id']} "
