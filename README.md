@@ -1,4 +1,5 @@
 # Real-Time UPI Fraud Detection & Alerting System
+# Real-Time UPI Fraud Detection & Alerting System
 
 A **real-time, fintech-grade fraud detection system** inspired by Indian UPI transaction flows.  
 Built locally using **Apache Kafka, Redis, Python, and classical Machine Learning**.
