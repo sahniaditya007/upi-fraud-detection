@@ -135,6 +135,9 @@ def run():
 
         for _ in range(burst_size):
             event = generate_event()
+            
+            with open("data/transactions.jsonl", "a") as f:
+                f.write(json.dumps(event) + "\n")
 
             producer.produce(
                 topic=TOPIC_NAME,
