@@ -1,0 +1,24 @@
+rules:
+  - id: HIGH_FREQUENCY_TXNS
+    description: Too many transactions in short window
+    condition:
+      txn_count_5m: { gt: 10 }
+    score: 40
+
+  - id: HIGH_AMOUNT_BURST
+    description: Large total amount in 5 minutes
+    condition:
+      total_amount_5m: { gt: 50000 }
+    score: 50
+
+  - id: MANY_UNIQUE_PAYEES
+    description: Possible mule behavior
+    condition:
+      unique_payees_5m: { gt: 5 }
+    score: 30
+
+  - id: VERY_LARGE_SINGLE_TXN
+    description: Single unusually large transaction
+    condition:
+      amount: { gt: 25000 }
+    score: 60

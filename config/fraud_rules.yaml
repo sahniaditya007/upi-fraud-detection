@@ -1,0 +1,30 @@
+rules:
+  velocity:
+    description: "Too many transactions in short time"
+    window_seconds: 60
+    max_txns: 5
+    score: 30
+
+  high_amount:
+    description: "Unusually high transaction amount"
+    threshold: 50000
+    score: 25
+
+  new_beneficiary:
+    description: "First transaction to a beneficiary"
+    score: 20
+
+  night_transaction:
+    description: "Transaction during risky hours"
+    start_hour: 0
+    end_hour: 5
+    score: 10
+
+  mule_pattern:
+    description: "Many users sending to same beneficiary"
+    unique_senders_threshold: 4
+    window_seconds: 300
+    score: 40
+
+risk:
+  alert_threshold: 50

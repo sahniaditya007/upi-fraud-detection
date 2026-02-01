@@ -1,47 +1,88 @@
-from config.redis import get_redis_client
-
-redis_client = get_redis_client()
-
-
-def get_int(key):
-    val = redis_client.get(key)
-    return int(val) if val else 0
+import yaml
+from datetime import datetime
 
 
-def get_set_size(key):
-    return redis_client.scard(key)
+RULES_PATH = "config/fraud_rules.yaml"
 
 
-def evaluate_rules(event):
+class RuleEngine:
+    def __init__(self):
+        with open(RULES_PATH, "r") as f:
+            self.config = yaml.safe_load(f)
 
-    payer = event["payer_upi_id"]
-    payee = event["payee_upi_id"]
-    amount = event["amount"]
+        self.rules = self.config["rules"]
+        self.alert_threshold = self.config["risk"]["alert_threshold"]
 
-    risk_score = 0
-    triggered_rules = []
+    def evaluate(self, transaction: dict, redis_state: dict):
+        """
+        Evaluate transaction against all Tier-1 fraud rules.
 
-    # ---------- Rule 1: High velocity payer ----------
-    tx_count_60s = get_int(f"payer:{payer}:tx_count:60s")
-    if tx_count_60s >= 5:
-        risk_score += 25
-        triggered_rules.append("HIGH_TX_VELOCITY")
+        Inputs:
+        - transaction: raw Kafka event
+        - redis_state: derived behavioral features
 
-    # ---------- Rule 2: First-time high amount ----------
-    if amount >= 10000 and tx_count_60s <= 1:
-        risk_score += 30
-        triggered_rules.append("FIRST_TIME_HIGH_AMOUNT")
+        Returns:
+        - risk_score (int)
+        - triggered_rules (list[str])
+        """
 
-    # ---------- Rule 3: New beneficiary spread ----------
-    unique_payees_10m = get_set_size(f"payer:{payer}:unique_payees:600s")
-    if unique_payees_10m >= 5:
-        risk_score += 20
-        triggered_rules.append("RAPID_NEW_BENEFICIARIES")
+        risk_score = 0
+        triggered_rules = []
 
-    # ---------- Rule 4: Mule account detection ----------
-    unique_payers_10m = get_set_size(f"payee:{payee}:unique_payers:600s")
-    if unique_payers_10m >= 10:
-        risk_score += 35
-        triggered_rules.append("POTENTIAL_MULE_ACCOUNT")
+        # -------------------------------
+        # Rule 1: High velocity (burst)
+        # -------------------------------
+        velocity = self.rules["velocity"]
+        txn_count = redis_state.get("txn_count_5m", 0)
 
-    return min(risk_score, 100), triggered_rules
+        if txn_count > velocity["max_txns"]:
+            risk_score += velocity["score"]
+            triggered_rules.append("HIGH_VELOCITY")
+
+        # -------------------------------
+        # Rule 2: High total amount burst
+        # -------------------------------
+        high_amount = self.rules["high_amount"]
+        total_amount = redis_state.get("total_amount_5m", 0)
+
+        if total_amount >= high_amount["threshold"]:
+            risk_score += high_amount["score"]
+            triggered_rules.append("HIGH_AMOUNT_BURST")
+
+        # -------------------------------
+        # Rule 3: New beneficiary
+        # -------------------------------
+        if redis_state.get("is_new_beneficiary", False):
+            rule = self.rules["new_beneficiary"]
+            risk_score += rule["score"]
+            triggered_rules.append("NEW_BENEFICIARY")
+
+        # -------------------------------
+        # Rule 4: Late-night transaction
+        # -------------------------------
+        night = self.rules["night_transaction"]
+
+        txn_time = datetime.fromisoformat(transaction["timestamp"])
+        hour = txn_time.hour
+
+        if night["start_hour"] <= hour <= night["end_hour"]:
+            risk_score += night["score"]
+            triggered_rules.append("NIGHT_TRANSACTION")
+
+        # -------------------------------
+        # Rule 5: Mule / fan-in detection
+        # -------------------------------
+        mule = self.rules["mule_pattern"]
+        unique_senders = redis_state.get("unique_senders", 0)
+
+        if unique_senders >= mule["unique_senders_threshold"]:
+            risk_score += mule["score"]
+            triggered_rules.append("MULE_ACCOUNT_PATTERN")
+
+        return risk_score, triggered_rules
+
+    def should_alert(self, risk_score: int) -> bool:
+        """
+        Decide whether to emit fraud alert
+        """
+        return risk_score >= self.alert_threshold

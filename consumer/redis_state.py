@@ -1,29 +1,81 @@
-from config.redis import get_redis_client
+import time
+import redis
 
-redis_client = get_redis_client()
+# -----------------------------
+# Redis configuration
+# -----------------------------
+REDIS_HOST = "localhost"
+REDIS_PORT = 6379
+REDIS_DB = 0
+
+r = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
+    decode_responses=True,
+)
+
+# Sliding window
+WINDOW_SECONDS = 300
 
 
+# -----------------------------
+# Redis key helpers
+# -----------------------------
+def _txn_count_key(payer):
+    return f"txn:count:{payer}"
+
+
+def _txn_amount_key(payer):
+    return f"txn:amount:{payer}"
+
+
+def _unique_payee_key(payer):
+    return f"txn:payees:{payer}"
+
+
+def _last_txn_ts_key(payer):
+    return f"txn:last_ts:{payer}"
+
+
+# -----------------------------
+# Update Redis state
+# -----------------------------
 def update_redis_state(event):
     payer = event["payer_upi_id"]
     payee = event["payee_upi_id"]
-    amount = event["amount"]
+    amount = float(event["amount"])
 
-    # -------- PAYER velocity --------
-    tx_count_key = f"payer:{payer}:tx_count:60s"
-    amount_sum_key = f"payer:{payer}:amount_sum:60s"
+    now = int(time.time())
 
-    redis_client.incr(tx_count_key)
-    redis_client.incrby(amount_sum_key, amount)
+    pipe = r.pipeline()
 
-    redis_client.expire(tx_count_key, 60)
-    redis_client.expire(amount_sum_key, 60)
+    # Increment txn count
+    pipe.incr(_txn_count_key(payer))
+    pipe.expire(_txn_count_key(payer), WINDOW_SECONDS)
 
-    # -------- PAYER spread --------
-    payer_spread_key = f"payer:{payer}:unique_payees:600s"
-    redis_client.sadd(payer_spread_key, payee)
-    redis_client.expire(payer_spread_key, 600)
+    # Add amount
+    pipe.incrbyfloat(_txn_amount_key(payer), amount)
+    pipe.expire(_txn_amount_key(payer), WINDOW_SECONDS)
 
-    # -------- PAYEE aggregation (mule signal) --------
-    payee_agg_key = f"payee:{payee}:unique_payers:600s"
-    redis_client.sadd(payee_agg_key, payer)
-    redis_client.expire(payee_agg_key, 600)
+    # Track unique payees
+    pipe.sadd(_unique_payee_key(payer), payee)
+    pipe.expire(_unique_payee_key(payer), WINDOW_SECONDS)
+
+    # Track last transaction time
+    pipe.set(_last_txn_ts_key(payer), now)
+    pipe.expire(_last_txn_ts_key(payer), WINDOW_SECONDS)
+
+    pipe.execute()
+
+
+# -----------------------------
+# Fetch Redis-derived features
+# -----------------------------
+def get_redis_state(event):
+    payer = event["payer_upi_id"]
+
+    txn_count = r.get(_txn_count_key(payer))
+    total_amount = r.get(_txn_amount_key(payer))
+    unique_payees = r.scard(_unique_payee_key(payer))
+    last_ts = r.get(_last_txn_ts_key(payer))

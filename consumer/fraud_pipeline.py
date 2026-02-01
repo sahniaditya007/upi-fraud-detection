@@ -1,9 +1,10 @@
 import json
-import time
 from datetime import datetime
-from consumer.redis_state import update_redis_state
+
 from confluent_kafka import Consumer, KafkaException, KafkaError
-from rules.rule_engine import evaluate_rules
+
+from consumer.redis_state import update_redis_state, get_redis_state
+from rules.rule_engine import RuleEngine
 
 
 # -----------------------------
@@ -22,56 +23,66 @@ consumer_conf = {
 
 consumer = Consumer(consumer_conf)
 
+rule_engine = RuleEngine()
+
+
 # -----------------------------
-# Processing stub
+# Event processing
 # -----------------------------
 def process_event(event, metadata):
     update_redis_state(event)
-    
+
     risk_score, triggered_rules = evaluate_rules(event)
-    
+
     print(
         f"[EVENT] payer={event['payer_upi_id']} "
-        f"payee={event['payee_upi_id']} "
         f"amount={event['amount']} "
-        f"partition={metadata['partition']} "
-        f"offset={metadata['offset']}"
+        f"risk={risk_score} "
+        f"rules={triggered_rules}"
     )
-    
-#Main
+
+    if risk_score >= 70:
+        print("FRAUD ALERT")
+
+
+
+# -----------------------------
+# Main consumer loop
+# -----------------------------
 def run():
     print("Starting fraud pipeline consumer...")
     consumer.subscribe([TOPIC_NAME])
-    
+
     try:
         while True:
             msg = consumer.poll(timeout=1.0)
-            
+
             if msg is None:
                 continue
-            
+
             if msg.error():
                 if msg.error().code() == KafkaError._PARTITION_EOF:
                     continue
                 else:
                     raise KafkaException(msg.error())
-            
+
             event = json.loads(msg.value().decode("utf-8"))
-            
+
             metadata = {
                 "topic": msg.topic(),
                 "partition": msg.partition(),
                 "offset": msg.offset(),
                 "timestamp": msg.timestamp(),
             }
-            
+
             process_event(event, metadata)
-    
+
     except KeyboardInterrupt:
-        print("\n Stopping Consumer...")
-    
+        print("\nStopping Consumer...")
+
     finally:
         consumer.close()
+
 
 if __name__ == "__main__":
     run()
