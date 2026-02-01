@@ -1,5 +1,4 @@
 # Real-Time UPI Fraud Detection & Alerting System
-# Real-Time UPI Fraud Detection & Alerting System
 
 A **real-time, fintech-grade fraud detection system** inspired by Indian UPI transaction flows.  
 Built locally using **Apache Kafka, Redis, Python, and classical Machine Learning**.
@@ -101,39 +100,46 @@ Rules are **fully explainable** and configurable via YAML.
 ## 🚀 How to Run Locally
 
 ### 1️⃣ Start Kafka
+
 ```bash
 bin/kafka-server-start.sh config/server.properties
+```
 
 ### 2️⃣ Start Redis
 ```bash
 redis-server
+```
 
 ### 3️⃣ Activate Python Environment
 ```bash
 source .venv/bin/activate
+```
 
 ### 4️⃣ Start Fraud Consumer
 ```bash
 python -m consumer.fraud_pipeline
+```
 
 ### 5️⃣ Start UPI Transaction Simulator
 ```bash
 python3 producer/upi_simulator.py
+```
 
 ### Sample Output
 ```bash
 [EVENT] payer=user42@upi amount=38000 rule_score=60 ml_prob=0.81 final_risk=72 rules=['HIGH_AMOUNT_BURST']
 🚨 FRAUD ALERT | payer=user42@upi risk=72 rules=['HIGH_AMOUNT_BURST']
+```
 
 ### Offline ML Training
 ```bash
 python -m ml.generate_dataset
 python ml/train.py
-
+```
 
 ### Generated Artifacts
+```bash
 ml/model.pkl
 ml/scaler.pkl
-
-
+```
 ---
